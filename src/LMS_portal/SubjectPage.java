@@ -1,0 +1,250 @@
+package LMS_portal;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+
+public class SubjectPage extends JFrame {
+
+    JTextField subjectField;
+    JPanel listPanel;
+
+    String course;
+    int semester;
+    JFrame parent;
+
+    SubjectPage(String course, int semester, JFrame parent){
+
+        this.course = course;
+        this.semester = semester;
+        this.parent = parent;
+
+        setTitle(course + " - Semester " + semester);
+        setLayout(new BorderLayout());
+
+        // 🔥 BACKGROUND (AUTO SCALE)
+        JPanel bg = new JPanel(){
+            Image img = new ImageIcon(ClassLoader.getSystemResource("images/books.jpg")).getImage();
+
+            protected void paintComponent(Graphics g){
+                super.paintComponent(g);
+                g.drawImage(img, 0, 0, getWidth(), getHeight(), this);
+            }
+        };
+
+        bg.setLayout(new GridBagLayout());
+        setContentPane(bg);
+
+        // 🔥 MAIN PANEL (CENTERED)
+        JPanel panel = new JPanel();
+        panel.setPreferredSize(new Dimension(650,500));
+        panel.setBackground(new Color(255,255,255,180));
+        panel.setLayout(new BorderLayout(10,10));
+
+        // 🔥 HEADING
+        JLabel heading = new JLabel(course + " - Semester " + semester, JLabel.CENTER);
+        heading.setFont(new Font("Arial",Font.BOLD,24));
+        panel.add(heading, BorderLayout.NORTH);
+
+        // 🔽 CENTER CONTENT
+        JPanel centerPanel = new JPanel(new BorderLayout(10,10));
+        centerPanel.setOpaque(false);
+
+        // 🔽 INPUT PANEL
+        JPanel inputPanel = new JPanel(new BorderLayout(10,10));
+        inputPanel.setOpaque(false);
+
+        subjectField = new JTextField();
+        inputPanel.add(subjectField, BorderLayout.CENTER);
+
+        JButton addBtn = new JButton("Add Subject");
+        addBtn.setBackground(Color.BLACK);
+        addBtn.setForeground(Color.WHITE);
+        inputPanel.add(addBtn, BorderLayout.EAST);
+
+        centerPanel.add(inputPanel, BorderLayout.NORTH);
+
+        // 🔽 SUBJECT LIST
+        listPanel = new JPanel();
+        listPanel.setLayout(new GridLayout(0,1,10,10));
+        listPanel.setBackground(Color.WHITE);
+
+        JScrollPane scroll = new JScrollPane(listPanel);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(Color.WHITE);
+
+        centerPanel.add(scroll, BorderLayout.CENTER);
+
+        panel.add(centerPanel, BorderLayout.CENTER);
+
+        // 🔙 BACK BUTTON
+        JButton back = new JButton("Back");
+        back.setBackground(Color.BLACK);
+        back.setForeground(Color.WHITE);
+        back.setPreferredSize(new Dimension(150,40));
+
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setOpaque(false);
+        bottomPanel.add(back);
+
+        panel.add(bottomPanel, BorderLayout.SOUTH);
+
+        // 🔥 LOAD SUBJECTS
+        loadSubjects();
+
+        // 🔥 ADD SUBJECT
+        addBtn.addActionListener(e -> {
+
+            String subject = subjectField.getText().trim();
+
+            if(subject.equals("")){
+                JOptionPane.showMessageDialog(null,"Enter subject name");
+                return;
+            }
+
+            try{
+                Conn c = new Conn();
+
+                String q = "INSERT INTO subjects(course_name, semester_no, subject_name) VALUES(?,?,?)";
+                PreparedStatement pst = c.c.prepareStatement(q);
+
+                pst.setString(1, course);
+                pst.setInt(2, semester);
+                pst.setString(3, subject);
+
+                pst.executeUpdate();
+
+                JOptionPane.showMessageDialog(null,"Subject Added Successfully");
+
+                subjectField.setText("");
+                loadSubjects();
+
+            }catch(Exception ex){
+                ex.printStackTrace();
+            }
+        });
+
+        // 🔙 BACK ACTION
+        back.addActionListener(e -> {
+            dispose();
+            parent.setVisible(true);
+        });
+
+        // 🔥 ADD PANEL CENTER
+        bg.add(panel);
+
+        // 🔥 WINDOW SETTINGS
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
+        setMinimumSize(new Dimension(800,600));
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setVisible(true);
+    }
+
+    // 🔥 LOAD SUBJECTS
+    void loadSubjects(){
+
+        listPanel.removeAll();
+
+        try{
+            Conn c = new Conn();
+
+            String q = "SELECT subject_name FROM subjects WHERE course_name=? AND semester_no=?";
+            PreparedStatement pst = c.c.prepareStatement(q);
+
+            pst.setString(1, course);
+            pst.setInt(2, semester);
+
+            ResultSet rs = pst.executeQuery();
+
+            boolean found = false;
+
+            while(rs.next()){
+
+                found = true;
+                String sub = rs.getString("subject_name");
+
+                JButton btn = new JButton("• " + sub);
+                btn.setFont(new Font("Arial", Font.BOLD, 18));
+
+                btn.setUI(new javax.swing.plaf.basic.BasicButtonUI());
+                btn.setBorder(null);
+                btn.setMargin(new Insets(0,0,0,0));
+
+                btn.setBackground(Color.WHITE);
+                btn.setForeground(Color.BLACK);
+
+                btn.setOpaque(false);
+                btn.setContentAreaFilled(false);
+                btn.setBorderPainted(false);
+                btn.setFocusPainted(false);
+
+                btn.setHorizontalAlignment(SwingConstants.LEFT);
+                btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+                btn.addActionListener(e -> {
+                    new NotesPage(sub, "admin");
+                });
+
+                btn.addMouseListener(new MouseAdapter(){
+
+                    public void mouseEntered(MouseEvent e){
+                        btn.setText("<html><u>• " + sub + "</u></html>");
+                    }
+
+                    public void mouseExited(MouseEvent e){
+                        btn.setText("• " + sub);
+                    }
+
+                    public void mousePressed(MouseEvent e){
+
+                        if(SwingUtilities.isRightMouseButton(e)){
+
+                            int confirm = JOptionPane.showConfirmDialog(null,
+                                    "Delete " + sub + "?",
+                                    "Confirm",
+                                    JOptionPane.YES_NO_OPTION);
+
+                            if(confirm == JOptionPane.YES_OPTION){
+
+                                try{
+                                    Conn c = new Conn();
+
+                                    String q = "DELETE FROM subjects WHERE course_name=? AND semester_no=? AND subject_name=?";
+                                    PreparedStatement pst = c.c.prepareStatement(q);
+
+                                    pst.setString(1, course);
+                                    pst.setInt(2, semester);
+                                    pst.setString(3, sub);
+
+                                    pst.executeUpdate();
+
+                                    JOptionPane.showMessageDialog(null,"Deleted");
+
+                                    loadSubjects();
+
+                                }catch(Exception ex){
+                                    ex.printStackTrace();
+                                }
+                            }
+                        }
+                    }
+                });
+
+                listPanel.add(btn);
+            }
+
+            if(!found){
+                JLabel empty = new JLabel("No Subjects Added", JLabel.CENTER);
+                empty.setFont(new Font("Arial",Font.BOLD,18));
+                listPanel.add(empty);
+            }
+
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        listPanel.revalidate();
+        listPanel.repaint();
+    }
+}
